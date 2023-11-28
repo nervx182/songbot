@@ -62,8 +62,7 @@ class SongBot(object):
 
 
     def search_song(self, update: Update, context: CallbackContext) -> None:
-        resp = requests.get('https://api.spotify.com/v1/search', headers={'Authorization': 'Bearer {self.SPOTIFY_ACCESS_TOKEN}'}, params={"q": update.message.text[6:], "type": "track"})
-
+        resp = requests.get('https://api.spotify.com/v1/search', headers={'Authorization': f"Bearer {self.SPOTIFY_ACCESS_TOKEN}"}, params={"q": update.message.text[6:], "type": "track"})
         context.bot.send_message(update.message.chat_id, resp.json()['tracks']['items'][0]['external_urls']['spotify'])
 
     def inline_query(self, update: Update, context: CallbackContext) -> None:
