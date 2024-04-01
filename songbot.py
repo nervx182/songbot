@@ -1,93 +1,63 @@
 import logging
-
-from telegram import InlineQueryResultArticle, InputTextMessageContent, Update, InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler, InlineQueryHandler
-import requests
-from html import escape
-from uuid import uuid4
-from base64 import b64encode
-import schedule, threading, time
-from dotenv import load_dotenv
 import os
+import re
+from uuid import uuid4
+
+from dotenv import load_dotenv
+from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
+from telegram.ext import Updater, CallbackContext, InlineQueryHandler, CommandHandler
+
+from streamings.spotify import Spotify
+from streamings.yandex import YandexMusic
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 class SongBot(object):
+    BOT_TOKEN = os.getenv('BOT_TOKEN')
     CLIENT_ID = os.getenv('CLIENT_ID')
     CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-    BOT_TOKEN = os.getenv('BOT_TOKEN')
+    INLINE_PATTERN = re.compile("([YS]) (.*)")
 
-    def run_continuously(self, interval=1):
-        """Continuously run, while executing pending jobs at each
-        elapsed time interval.
-        @return cease_continuous_run: threading. Event which can
-        be set to cease continuous run. Please note that it is
-        *intended behavior that run_continuously() does not run
-        missed jobs*. For example, if you've registered a job that
-        should run every minute and you set a continuous run
-        interval of one hour then your job won't be run 60 times
-        at each interval but only once.
-        """
-        cease_continuous_run = threading.Event()
-
-        class ScheduleThread(threading.Thread):
-            @classmethod
-            def run(cls):
-                while not cease_continuous_run.is_set():
-                    schedule.run_pending()
-                    time.sleep(interval)
-
-        continuous_thread = ScheduleThread()
-        continuous_thread.start()
-        return cease_continuous_run
-
-    def get_spotify_access_token(self) -> None:
-        response = requests.post('https://accounts.spotify.com/api/token', data='grant_type=client_credentials', headers={
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic {}'.format(b64encode(f"{self.CLIENT_ID}:{self.CLIENT_SECRET}".encode()).decode())
-        })
-
-        self.SPOTIFY_ACCESS_TOKEN = response.json()['access_token']
-
-        secs = response.json()['expires_in']
-        if secs > 300:
-            secs -= 300
-        #schedule new job to renew access token
-        schedule.every(secs).seconds.do(self.get_spotify_access_token)
-
-        #stop previous job
-        return schedule.CancelJob
-
+    def __init__(self):
+        self.spotify = Spotify(self.CLIENT_ID, self.CLIENT_SECRET)
+        self.yandex = YandexMusic()
 
     def search_song(self, update: Update, context: CallbackContext) -> None:
-        resp = requests.get('https://api.spotify.com/v1/search', headers={'Authorization': f"Bearer {self.SPOTIFY_ACCESS_TOKEN}"}, params={"q": update.message.text[6:], "type": "track"})
-        context.bot.send_message(update.message.chat_id, resp.json()['tracks']['items'][0]['external_urls']['spotify'])
+        songs = self.spotify.search(update.message.text[6:])
+        if songs:
+            context.bot.send_message(update.message.chat_id, songs[0].url)
+        else:
+            context.bot.send_message(update.message.chat_id, "No results :(")
 
     def inline_query(self, update: Update, context: CallbackContext) -> None:
         """Handle the inline query. This is run when you type: @botusername <query>"""
-        query = update.inline_query.query
-        print(f'someone queried inline {query}')
-        if not query:  # empty query should not be handled
-            return
+        q = update.inline_query.query
+        streaming = self.spotify
 
-        resp = requests.get('https://api.spotify.com/v1/search', headers={'Authorization': f"Bearer {self.SPOTIFY_ACCESS_TOKEN}"}, params={"q": query, "type": "track"})
+        if self.INLINE_PATTERN.match(q):
+            split = self.INLINE_PATTERN.split(q)
+            if split[1] == 'Y':
+                streaming = self.yandex
+            q = split[2]
+            print(q)
 
-        if (resp.status_code == 200 and resp.json()['tracks']):
-            results = map(lambda t:  InlineQueryResultArticle(
-                    id=str(uuid4()),
-                    title="{} - {}".format(t['artists'][0]['name'], t['name']),
-                    input_message_content=InputTextMessageContent(t['external_urls']['spotify']),
-                    thumb_url=t['album']['images'][-1]['url']
-                ), resp.json()['tracks']['items'])
+        songs = streaming.search(q)
 
-            update.inline_query.answer(list(results))
+        results = map(lambda song: InlineQueryResultArticle(
+            id=str(uuid4()),
+            title="{} - {}".format(song.artist, song.name),
+            input_message_content=InputTextMessageContent(song.url),
+            thumb_url=song.image
+        ), songs)
+
+        update.inline_query.answer(list(results))
 
     def main(self) -> None:
-        self.get_spotify_access_token()
         # Start the background thread
-        stop_run_continuously = self.run_continuously()
+        # stop_run_continuously = self.run_continuously()
 
         updater = Updater(f"{self.BOT_TOKEN}")
 
@@ -106,7 +76,7 @@ class SongBot(object):
         updater.idle()
 
         # Stop the background thread
-        stop_run_continuously.set()
+        # stop_run_continuously.set()
 
 
 if __name__ == '__main__':
