@@ -1,11 +1,18 @@
+aiofiles==23.2.1
+aiohttp==3.9.4
+aiosignal==1.3.1
 APScheduler==3.6.3
+attrs==23.2.0
 cachetools==4.2.2
 certifi==2023.11.17
 charset-normalizer==3.3.2
 distlib==0.3.7
 filelock==3.13.1
+frozenlist==1.4.1
 idna==3.4
+multidict==6.0.5
 platformdirs==4.0.0
+PySocks==1.7.1
 python-dotenv==1.0.0
 python-telegram-bot==13.12
 pytz==2023.3.post1
@@ -16,3 +23,6 @@ tornado==6.3.3
 tzlocal==5.2
 urllib3==2.1.0
 virtualenv==20.24.7
+yandex-music==2.2.0
+yarl==1.9.4
+ytmusicapi==1.3.2
