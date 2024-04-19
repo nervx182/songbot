@@ -8,6 +8,9 @@ class YandexMusic(AbstractStreaming):
     def __init__(self):
         self.client = yandex_music.Client()
 
+    def command_code(self) -> str:
+        return 'Y'
+
     def search(self, req: str) -> list[SongResult]:
         results = self.client.search(text=req)
 

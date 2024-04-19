@@ -13,3 +13,7 @@ class AbstractStreaming(ABC):
     @abstractmethod
     def search(self, req: str) -> list[SongResult]:
         raise NotImplementedError
+
+    @abstractmethod
+    def command_code(self) -> str:
+        raise NotImplementedError

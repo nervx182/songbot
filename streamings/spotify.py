@@ -14,20 +14,8 @@ class Spotify(AbstractStreaming):
         self.access_token = None
         self.token_expires = None
 
-    def get_spotify_access_token(self) -> None:
-        now = datetime.datetime.now()
-
-        response = requests.post('https://accounts.spotify.com/api/token', data='grant_type=client_credentials',
-                                 headers={
-                                     'Content-Type': 'application/x-www-form-urlencoded',
-                                     'Authorization': 'Basic {}'.format(
-                                         b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode())
-                                 })
-
-        self.access_token = response.json()['access_token']
-
-        secs = response.json()['expires_in']
-        self.token_expires = now + datetime.timedelta(seconds=secs)
+    def command_code(self) -> str:
+        return 'S'
 
     def search(self, req: str) -> list[SongResult]:
         if not self.token_expires or self.token_expires <= datetime.datetime.now():
@@ -48,3 +36,18 @@ class Spotify(AbstractStreaming):
             ), resp.json()['tracks']['items'])
 
         return list(results)
+
+    def get_spotify_access_token(self) -> None:
+        now = datetime.datetime.now()
+
+        response = requests.post('https://accounts.spotify.com/api/token', data='grant_type=client_credentials',
+                                 headers={
+                                     'Content-Type': 'application/x-www-form-urlencoded',
+                                     'Authorization': 'Basic {}'.format(
+                                         b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode())
+                                 })
+
+        self.access_token = response.json()['access_token']
+
+        secs = response.json()['expires_in']
+        self.token_expires = now + datetime.timedelta(seconds=secs)
