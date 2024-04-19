@@ -9,6 +9,7 @@ from telegram.ext import Updater, CallbackContext, InlineQueryHandler, CommandHa
 
 from streamings.spotify import Spotify
 from streamings.yandex import YandexMusic
+from streamings.youtube_music import YoutubeMusic
 
 load_dotenv()
 
@@ -19,11 +20,21 @@ class SongBot(object):
     BOT_TOKEN = os.getenv('BOT_TOKEN')
     CLIENT_ID = os.getenv('CLIENT_ID')
     CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-    INLINE_PATTERN = re.compile("([YS]) (.*)")
+    INLINE_PATTERN = re.compile("([A-Z]+) (.*)")
 
     def __init__(self):
-        self.spotify = Spotify(self.CLIENT_ID, self.CLIENT_SECRET)
-        self.yandex = YandexMusic()
+        spotify = Spotify(self.CLIENT_ID, self.CLIENT_SECRET)
+        self.default_streaming = spotify
+        streamings_list = [spotify,
+                           YandexMusic(),
+                           YoutubeMusic()]
+
+        self.streaming_dict = {}
+        for streaming in streamings_list:
+            if streaming.command_code() in self.streaming_dict:
+                raise Exception("Collision in command codes!")
+
+            self.streaming_dict[streaming.command_code().upper()] = streaming
 
     def search_song(self, update: Update, context: CallbackContext) -> None:
         songs = self.spotify.search(update.message.text[6:])
@@ -35,14 +46,19 @@ class SongBot(object):
     def inline_query(self, update: Update, context: CallbackContext) -> None:
         """Handle the inline query. This is run when you type: @botusername <query>"""
         q = update.inline_query.query
-        streaming = self.spotify
 
         if self.INLINE_PATTERN.match(q):
             split = self.INLINE_PATTERN.split(q)
-            if split[1] == 'Y':
-                streaming = self.yandex
-            q = split[2]
-            print(q)
+            streaming_key = split[1].upper()
+            if streaming_key in self.streaming_dict:
+                q = split[2]
+                streaming = self.streaming_dict[streaming_key]
+            else:
+                streaming = self.default_streaming
+        else:
+            streaming = self.default_streaming
+
+        print(q)
 
         songs = streaming.search(q)
 
